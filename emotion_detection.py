@@ -1,32 +1,42 @@
-import cv2
+import streamlit as st
 from deepface import DeepFace
+import cv2
+import numpy as np
+from PIL import Image
 
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+# Streamlit UI
+st.title("😃 Emotion Detection App")
+st.write("Upload an image to detect the emotion.")
 
-cap = cv2.VideoCapture(0)
+# File uploader
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-while True:
-    ret, frame = cap.read()
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    rgb_frame = cv2.cvtColor(gray_frame, cv2.COLOR_GRAY2RGB)
+if uploaded_file is not None:
+    # Load Image
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    faces = face_cascade.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    # Convert image to OpenCV format
+    img_cv = np.array(image)
+    img_cv = cv2.cvtColor(img_cv, cv2.COLOR_RGB2BGR)
 
-    for (x, y, w, h) in faces:
-        face_roi = rgb_frame[y:y + h, x:x + w]
+    try:
+        # Perform emotion analysis
+        st.write("🔍 *Analyzing emotions...*")
+        result = DeepFace.analyze(img_path=img_cv, actions=['emotion'], detector_backend='retinaface', enforce_detection=False)
 
-        result = DeepFace.analyze(face_roi, actions=['emotion'], enforce_detection=False)
+        # Get dominant emotion
+        dominant_emotion = result[0]['dominant_emotion']
+        emotion_scores = result[0]['emotion']
+
+        # Display result
+        st.success(f"🎭 Dominant Emotion: *{dominant_emotion.capitalize()}*")
         
-        emotion = result[0]['dominant_emotion']
+        # Show all emotion scores
+        st.write("📊 *Emotion Scores:*")
+        for emotion, score in emotion_scores.items():
+            st.write(f"{emotion.capitalize()}: {score:.2f}%")
 
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
-        cv2.putText(frame, emotion, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-
-    cv2.imshow('Real-time Emotion Detection', frame)
-
-    # Press 'q' to exit
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cap.release()
-cv2.destroyAllWindows()
+    except Exception as e:
+        st.error("😔 Could not detect a face. Try another image.")
+        st.write(f"Error: {str(e)}")
